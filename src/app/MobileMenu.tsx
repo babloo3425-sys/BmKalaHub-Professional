@@ -27,8 +27,8 @@ export default function MobileMenu() {
             Categories
           </a>
 
-          <a href="/profile" onClick={() => setOpen(false)}>
-            User
+          <a href="/user-access" onClick={() => setOpen(false)}>
+             User
           </a>
 
           <a href="/dashboard" onClick={() => setOpen(false)}>
