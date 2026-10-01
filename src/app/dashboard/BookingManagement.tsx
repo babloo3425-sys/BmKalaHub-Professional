@@ -88,6 +88,9 @@ export default function BookingManagement({
   const [completingId, setCompletingId] =
     useState<string | null>(null);
 
+  const [deletingBookingId, setDeletingBookingId] =
+    useState<string | null>(null);
+
   const [success, setSuccess] = useState<
     Record<string, string>
   >({});
@@ -249,6 +252,70 @@ export default function BookingManagement({
     }
   }
 
+      async function deleteBooking(bookingId: string) {
+      if (sendingId || completingId || deletingBookingId) {
+     return;
+   }
+
+    const confirmed = window.confirm(
+    "Delete this booking from your history? This action cannot be undone."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+    try {
+    setDeletingBookingId(bookingId);
+
+    setError((current) => ({
+      ...current,
+      [bookingId]: "",
+    }));
+
+    setSuccess((current) => ({
+      ...current,
+      [bookingId]: "",
+    }));
+
+    const response = await fetch("/api/bookings", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookingId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError((current) => ({
+        ...current,
+        [bookingId]:
+          data.message ||
+          "Failed to delete booking.",
+      }));
+      return;
+    }
+
+    setRealtimeBookings((current) =>
+      current.filter(
+        (booking) => booking._id !== bookingId
+      )
+    );
+  } catch {
+    setError((current) => ({
+      ...current,
+      [bookingId]:
+        "Something went wrong while deleting the booking.",
+    }));
+  } finally {
+    setDeletingBookingId(null);
+  }
+}
+
   if (realtimeBookings.length === 0) {
     return (
       <section className="booking-management">
@@ -325,6 +392,76 @@ export default function BookingManagement({
           font-weight: 800;
           letter-spacing: 0.04em;
           text-transform: uppercase;
+        }
+
+        .booking-header-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-shrink: 0;
+          flex-wrap: wrap;
+        }
+
+        .booking-delete-button {
+          min-height: 32px;
+          padding: 0 11px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+
+          border: 1px solid #fecaca;
+          border-radius: 8px;
+          background: #ffffff;
+          color: #dc2626;
+
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1;
+          white-space: nowrap;
+
+          cursor: pointer;
+
+          box-shadow:
+          0 3px 8px rgba(15, 23, 42, 0.10),
+          0 1px 2px rgba(220, 38, 38, 0.08);
+
+          transition:
+          background 0.18s ease,
+          color 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+        }
+
+        .booking-delete-button:hover:not(:disabled) {
+          background: #dc2626;
+          color: #ffffff;
+          border-color: #dc2626;
+
+          transform: translateY(-1px);
+
+          box-shadow:
+          0 6px 14px rgba(220, 38, 38, 0.22);
+        }
+
+        .booking-delete-button:active:not(:disabled) {
+          transform: translateY(0);
+          box-shadow:
+          0 3px 7px rgba(220, 38, 38, 0.16);
+        }
+
+        .booking-delete-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .booking-delete-button svg {
+          width: 14px;
+          height: 14px;
+         flex: 0 0 14px;
         }
 
         .booking-details {
@@ -507,6 +644,16 @@ export default function BookingManagement({
           .booking-details {
             grid-template-columns: 1fr;
           }
+
+          .booking-header-actions {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .booking-delete-button {
+            min-height: 34px;
+            padding: 0 12px;
+          }
         }
 
         @media (max-width: 480px) {
@@ -542,10 +689,33 @@ export default function BookingManagement({
                   </p>
                 </div>
 
-                <span className="booking-status">
-                  {booking.status}
-                </span>
-              </div>
+            <div className="booking-header-actions">
+            <span className="booking-status">
+              {booking.status}
+            </span>
+
+            {(booking.status === "rejected" ||
+              booking.status === "cancelled" ||
+              booking.status === "completed") && (
+            <button
+                type="button"
+                className="booking-delete-button"
+                onClick={() =>
+              deleteBooking(booking._id)
+            }
+              disabled={
+              deletingBookingId === booking._id
+            }
+              aria-label="Delete booking"
+              title="Delete booking"
+          >
+            {deletingBookingId === booking._id
+             ? "Deleting..."
+             : "Delete"}
+           </button>
+        )}
+     </div>
+</div>
 
               <div className="booking-details">
                 <div className="detail">

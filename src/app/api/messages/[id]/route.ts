@@ -7,6 +7,17 @@ import Enquiry from "@/models/Enquiry";
 import Profile from "@/models/Profile";
 import { verifyAuthToken } from "@/lib/auth";
 
+async function getAuthenticatedUserId() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("auth_token")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  return await verifyAuthToken(token);
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -14,17 +25,7 @@ export async function PATCH(
   try {
     await connectDB();
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
-
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    const userId = await verifyAuthToken(token);
+    const userId = await getAuthenticatedUserId();
 
     if (!userId) {
       return NextResponse.json(
@@ -54,11 +55,14 @@ export async function PATCH(
     }
 
     if (message.receiverId.toString() !== userId.toString()) {
-  return NextResponse.json(
-    { message: "You are not authorized to update this message" },
-    { status: 403 }
-  );
-}
+      return NextResponse.json(
+        {
+          message:
+            "You are not authorized to update this message",
+        },
+        { status: 403 }
+      );
+    }
 
     const enquiry = await Enquiry.findById(message.enquiryId)
       .select("artistId senderId")
@@ -83,7 +87,10 @@ export async function PATCH(
 
     if (!isSender && !isArtist) {
       return NextResponse.json(
-        { message: "You are not authorized for this enquiry" },
+        {
+          message:
+            "You are not authorized for this enquiry",
+        },
         { status: 403 }
       );
     }
@@ -100,7 +107,9 @@ export async function PATCH(
         returnDocument: "after",
       }
     )
-      .select("_id enquiryId senderId receiverId message read createdAt updatedAt")
+      .select(
+        "_id enquiryId senderId receiverId message read createdAt updatedAt"
+      )
       .lean();
 
     if (!updatedMessage) {
@@ -122,6 +131,88 @@ export async function PATCH(
 
     return NextResponse.json(
       { message: "Failed to update message" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    await connectDB();
+
+    const userId = await getAuthenticatedUserId();
+
+    if (!userId) {
+      return NextResponse.json(
+        { message: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await context.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { message: "Invalid message ID" },
+        { status: 400 }
+      );
+    }
+
+    const message = await Message.findById(id)
+      .select("_id enquiryId senderId receiverId")
+      .lean();
+
+    if (!message) {
+      return NextResponse.json(
+        { message: "Message not found" },
+        { status: 404 }
+      );
+    }
+
+    /*
+     * A user can delete only their own message.
+     * Messages belonging to the other participant
+     * must remain untouched.
+     */
+    if (message.senderId.toString() !== userId.toString()) {
+      return NextResponse.json(
+        {
+          message:
+            "You can only delete messages sent by you",
+        },
+        { status: 403 }
+      );
+    }
+
+    const deletedMessage = await Message.findOneAndDelete({
+      _id: id,
+      senderId: userId,
+    })
+      .select("_id")
+      .lean();
+
+    if (!deletedMessage) {
+      return NextResponse.json(
+        { message: "Message not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        message: "Message deleted successfully",
+        messageId: deletedMessage._id,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Delete message error:", error);
+
+    return NextResponse.json(
+      { message: "Failed to delete message" },
       { status: 500 }
     );
   }

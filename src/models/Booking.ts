@@ -2,12 +2,14 @@ import mongoose, {
   Schema,
   models,
 } from "mongoose";
+import Enquiry from "@/models/Enquiry";
+
 
 const BookingSchema = new Schema(
   {
     enquiryId: {
       type: Schema.Types.ObjectId,
-      ref: "Enquiry",
+      ref: Enquiry,
       required: true,
       index: true,
     },

@@ -50,6 +50,9 @@ export default function CustomerBookings({
   const [respondingId, setRespondingId] =
     useState<string | null>(null);
 
+  const [deletingBookingId, setDeletingBookingId] =
+  useState<string | null>(null);
+
   const [reviewSubmittingId, setReviewSubmittingId] =
     useState<string | null>(null);
 
@@ -219,6 +222,73 @@ export default function CustomerBookings({
     }
   }
 
+    // ---------------------------------
+  // Delete completed booking history
+// ---------------------------------
+    async function deleteBooking(bookingId: string) {
+    if (deletingBookingId) {
+    return;
+  }
+
+    const confirmed = window.confirm(
+    "Delete this booking from your history? This action cannot be undone."
+  );
+
+    if (!confirmed) {
+    return;
+  }
+
+  try {
+    setDeletingBookingId(bookingId);
+
+    setError((current) => ({
+      ...current,
+      [bookingId]: "",
+    }));
+
+    setSuccess((current) => ({
+      ...current,
+      [bookingId]: "",
+    }));
+
+    const response = await fetch("/api/bookings", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookingId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError((current) => ({
+        ...current,
+        [bookingId]:
+          data.message ||
+          "Failed to delete booking.",
+      }));
+      return;
+    }
+
+    setItems((current) =>
+      current.filter(
+        (booking) => booking._id !== bookingId
+      )
+    );
+  } catch {
+    setError((current) => ({
+      ...current,
+      [bookingId]:
+        "Something went wrong while deleting the booking.",
+    }));
+  } finally {
+    setDeletingBookingId(null);
+  }
+}
+
   // ---------------------------------
   // Submit review
   // ---------------------------------
@@ -362,6 +432,71 @@ export default function CustomerBookings({
           justify-content: space-between;
           gap: 12px;
         }
+
+        .booking-heading {
+          min-width: 0;
+         flex: 1;
+        }
+
+        .booking-top-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .booking-delete-button {
+          min-height: 30px;
+          padding: 0 11px;
+          border: 1px solid #fecaca;
+          border-radius: 8px;
+          background: #ffffff;
+          color: #dc2626;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow:
+          0 3px 8px rgba(15, 23, 42, 0.10),
+          0 1px 2px rgba(220, 38, 38, 0.08);
+          transition:
+          background 0.18s ease,
+          color 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+        }
+
+        .booking-delete-button:hover:not(:disabled) {
+          background: #dc2626;
+          color: #ffffff;
+          border-color: #dc2626;
+          transform: translateY(-1px);
+          box-shadow:
+          0 5px 12px rgba(220, 38, 38, 0.22);
+        }
+
+        .booking-delete-button:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .booking-delete-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+      @media (max-width: 600px) {
+        .booking-top-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .booking-delete-button {
+          min-height: 34px;
+          padding: 0 12px;
+        }
+      }
 
         .booking-title {
           margin: 0;
@@ -654,23 +789,46 @@ export default function CustomerBookings({
               className="booking-item"
               key={booking._id}
             >
-              <div className="booking-top">
-                <div>
-                  <h3 className="booking-title">
-                    {booking.service}
-                  </h3>
+          <div className="booking-top">
+          <div className="booking-heading">
+          <h3 className="booking-title">
+          {booking.service}
+          </h3>
 
-                  <p className="booking-artist">
-                    Artist:{" "}
-                    {booking.artistId?.name ||
-                      "Artist"}
-                  </p>
-                </div>
+          <p className="booking-artist">
+             Artist:{" "}
+          {booking.artistId?.name ||
+            "Artist"}
+          </p>
+      </div>
 
-                <span className="status">
-                  {booking.status}
-                </span>
-              </div>
+      <div className="booking-top-actions">
+      <span className="status">
+        {booking.status}
+      </span>
+
+    {(booking.status === "rejected" ||
+      booking.status === "cancelled" ||
+      booking.status === "completed") && (
+      <button
+        type="button"
+        className="booking-delete-button"
+        onClick={() =>
+          deleteBooking(booking._id)
+        }
+        disabled={
+          deletingBookingId === booking._id
+        }
+        aria-label="Delete booking"
+        title="Delete booking"
+      >
+        {deletingBookingId === booking._id
+          ? "Deleting..."
+          : "Delete"}
+      </button>
+    )}
+  </div>
+</div>
 
               <div className="booking-details">
                 <div className="detail">

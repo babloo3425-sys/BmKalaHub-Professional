@@ -148,6 +148,15 @@ export default function Enquiries() {
         return;
       }
 
+      window.dispatchEvent(
+  new CustomEvent("bmkalahub:enquiry-status-updated", {
+    detail: {
+      enquiryId,
+      status,
+    },
+  })
+);
+
       setError("");
     } catch {
       setEnquiries(previousEnquiries);
@@ -158,6 +167,52 @@ export default function Enquiries() {
       setUpdatingId(null);
     }
   }
+
+     async function deleteEnquiry(enquiryId: string) {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this enquiry?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setError("");
+
+    const response = await fetch(
+      `/api/enquiries/${enquiryId}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(
+        data.message || "Failed to delete enquiry."
+      );
+      return;
+    }
+
+    setEnquiries((current) =>
+      current.filter(
+      (enquiry) => enquiry._id !== enquiryId
+    )
+   );
+
+    window.dispatchEvent(
+     new CustomEvent("bmkalahub:enquiry-deleted", {
+        detail: { enquiryId },
+    })
+  );
+     } catch {
+      setError(
+      "Something went wrong while deleting the enquiry."
+    );
+  }
+}
 
   return (
     <section className="enquiries-section">
@@ -287,6 +342,30 @@ export default function Enquiries() {
                         </option>
                       ))}
                     </select>
+
+                     <button
+                       type="button"
+                       className="enquiry-delete-button"
+                       onClick={() => deleteEnquiry(enquiry._id)}
+                       aria-label="Delete enquiry"
+                       title="Delete enquiry"
+                   >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                    </svg>
+                  </button>
                   </label>
                 </div>
               </article>
@@ -551,7 +630,46 @@ export default function Enquiries() {
             gap: 5px;
           }
         }
-      `}</style>
+
+          .enquiry-delete-button {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e5e7eb;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #64748b;
+            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.10);
+            cursor: pointer;
+            transition:
+            background 0.18s ease,
+            color 0.18s ease,
+            border-color 0.18s ease,
+            transform 0.18s ease,
+            box-shadow 0.18s ease;
+        }
+
+          .enquiry-delete-button:hover {
+            background: #fff1f2;
+            color: #dc2626;
+            border-color: #fecdd3;
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(220, 38, 38, 0.14);
+        }
+
+          .enquiry-delete-button:active {
+            transform: translateY(0);
+        }
+
+          .enquiry-delete-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+       `}</style>
     </section>
   );
 }

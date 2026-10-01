@@ -48,6 +48,9 @@ export default function CustomerMessages() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [deletingMessageId, setDeletingMessageId] =
+  useState<string | null>(null);
+
   const [error, setError] = useState("");
   const [messageError, setMessageError] = useState("");
 
@@ -308,6 +311,93 @@ export default function CustomerMessages() {
     );
   } finally {
     setSending(false);
+  }
+}
+
+    async function deleteMessage(messageId: string) {
+  if (deletingMessageId) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this message?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setDeletingMessageId(messageId);
+    setMessageError("");
+
+    console.log(
+      "Deleting customer message:",
+      messageId
+    );
+
+    const response = await fetch(
+      `/api/messages/${encodeURIComponent(messageId)}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        cache: "no-store",
+      }
+    );
+
+    const rawResponse = await response.text();
+
+    let data: {
+      message?: string;
+      messageId?: string;
+    } = {};
+
+    try {
+      data = rawResponse
+        ? JSON.parse(rawResponse)
+        : {};
+    } catch {
+      console.error(
+        "Delete message API returned non-JSON:",
+        rawResponse
+      );
+    }
+
+    console.log(
+      "Delete message response:",
+      response.status,
+      data
+    );
+
+    if (!response.ok) {
+      setMessageError(
+        data.message ||
+          `Failed to delete message. Server returned ${response.status}.`
+      );
+      return;
+    }
+
+    setMessages((currentMessages) =>
+      currentMessages.filter(
+        (item) => item._id !== messageId
+      )
+    );
+
+    console.log(
+      "Customer message deleted:",
+      messageId
+    );
+  } catch (error) {
+    console.error(
+      "Delete message request error:",
+      error
+    );
+
+    setMessageError(
+      "Something went wrong while deleting the message."
+    );
+  } finally {
+    setDeletingMessageId(null);
   }
 }
 
@@ -630,6 +720,72 @@ export default function CustomerMessages() {
           word-break: break-word;
         }
 
+        .customer-message-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 7px;
+          max-width: 88%;
+         }
+
+        .customer-message-row.mine {
+          align-self: flex-end;
+          flex-direction: row-reverse;
+        }
+
+        .customer-message-row.theirs {
+          align-self: flex-start;
+        }
+
+        .customer-message-row .customer-message {
+          max-width: 78%;
+        }
+
+        .customer-message-delete {
+          width: 32px;
+          height: 32px;
+          flex: 0 0 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #e5e7eb;
+          border-radius: 9px;
+          background: #ffffff;
+          color: #dc2626;
+          box-shadow:
+          0 4px 12px rgba(15, 23, 42, 0.14),
+          0 1px 3px rgba(220, 38, 38, 0.10);
+          cursor: pointer;
+          transition:
+          background 0.18s ease,
+          color 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+        }
+
+        .customer-message-delete:hover {
+          background: #dc2626;
+          color: #ffffff;
+          border-color: #dc2626;
+          transform: translateY(-1px);
+          box-shadow: 0 5px 14px rgba(220, 38, 38, 0.14);
+        }
+
+        .customer-message-delete:active {
+          transform: translateY(0);
+        }
+
+        .customer-message-delete:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .customer-message-delete svg {
+          width: 16px;
+          height: 16px;
+        }
+
         .customer-message.mine {
           align-self: flex-end;
           background: #7c3aed;
@@ -746,6 +902,20 @@ export default function CustomerMessages() {
 
           .customer-message {
             max-width: 88%;
+          }
+
+          .customer-message-row {
+            max-width: 96%;
+          }
+
+          .customer-message-row .customer-message {
+            max-width: calc(100% - 39px);
+          }
+
+          .customer-message-delete {
+            width: 30px;
+            height: 30px;
+            flex-basis: 30px;
           }
 
           .customer-composer {
@@ -903,19 +1073,52 @@ export default function CustomerMessages() {
                       currentUserId;
 
                     return (
-                      <div
-                        key={item._id}
-                        className={`customer-message ${
-                          mine ? "mine" : "theirs"
-                        }`}
-                      >
-                        {item.message}
+  <div
+    key={item._id}
+    className={`customer-message-row ${
+      mine ? "mine" : "theirs"
+    }`}
+  >
+    <div
+      className={`customer-message ${
+        mine ? "mine" : "theirs"
+      }`}
+    >
+      {item.message}
 
-                        <span className="customer-message-time">
-                          {formatDate(item.createdAt)}
-                        </span>
-                      </div>
-                    );
+      <span className="customer-message-time">
+        {formatDate(item.createdAt)}
+      </span>
+    </div>
+
+    {mine && (
+      <button
+        type="button"
+        className="customer-message-delete"
+        onClick={() => deleteMessage(item._id)}
+        disabled={deletingMessageId === item._id}
+        aria-label="Delete message"
+        title="Delete message"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v5" />
+          <path d="M14 11v5" />
+        </svg>
+      </button>
+    )}
+  </div>
+);
                   })
                 )}
               </div>

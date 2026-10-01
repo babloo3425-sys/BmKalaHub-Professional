@@ -8,6 +8,7 @@ import Enquiries from "./Enquiries";
 import Messages from "./Messages";
 import BookingManagement from "./BookingManagement";
 import Booking from "@/models/Booking";
+import Enquiry from "@/models/Enquiry";
 import Notification from "@/models/Notification";
 import RealtimeNotifications from "./RealtimeNotifications";
 import { verifyAuthToken } from "@/lib/auth";

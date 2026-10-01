@@ -39,6 +39,9 @@ export default function Messages() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [deletingMessageId, setDeletingMessageId] =
+  useState<string | null>(null);
+
   const [error, setError] = useState("");
   const [messageError, setMessageError] = useState("");
 
@@ -118,14 +121,122 @@ export default function Messages() {
     });
   });
 
+    socket.on(
+  "enquiry-status-updated",
+  (data: {
+    enquiryId: string;
+    status: EnquiryStatus;
+  }) => {
+    setEnquiries((currentEnquiries) =>
+      currentEnquiries.map((enquiry) =>
+        enquiry._id === data.enquiryId
+          ? {
+              ...enquiry,
+              status: data.status,
+            }
+          : enquiry
+      )
+    );
+  }
+);
   return () => {
     socket.disconnect();
   };
 }, [selectedEnquiry, currentUserId]);
 
   useEffect(() => {
+  function handleEnquiryStatusUpdated(event: Event) {
+    const customEvent =
+      event as CustomEvent<{
+        enquiryId?: string;
+        status?: EnquiryStatus;
+      }>;
+
+    const enquiryId = customEvent.detail?.enquiryId;
+    const status = customEvent.detail?.status;
+
+    if (!enquiryId || !status) {
+      return;
+    }
+
+    setEnquiries((currentEnquiries) =>
+      currentEnquiries.map((enquiry) =>
+        enquiry._id === enquiryId
+          ? {
+              ...enquiry,
+              status,
+            }
+          : enquiry
+      )
+    );
+  }
+
+  window.addEventListener(
+    "bmkalahub:enquiry-status-updated",
+    handleEnquiryStatusUpdated
+  );
+
+  return () => {
+    window.removeEventListener(
+      "bmkalahub:enquiry-status-updated",
+      handleEnquiryStatusUpdated
+    );
+  };
+}, []);
+
+  useEffect(() => {
     loadEnquiries();
   }, []);
+
+   useEffect(() => {
+  function handleEnquiryDeleted(event: Event) {
+    const customEvent =
+      event as CustomEvent<{
+        enquiryId?: string;
+      }>;
+
+    const enquiryId =
+      customEvent.detail?.enquiryId;
+
+    if (!enquiryId) {
+      return;
+    }
+
+    setEnquiries((currentEnquiries) =>
+      currentEnquiries.filter(
+        (enquiry) => enquiry._id !== enquiryId
+      )
+    );
+
+    setSelectedEnquiry((currentEnquiry) =>
+      currentEnquiry &&
+      currentEnquiry._id === enquiryId
+        ? null
+        : currentEnquiry
+    );
+
+    setMessages((currentMessages) =>
+      currentMessages.filter(
+        (message) =>
+          message.enquiryId !== enquiryId
+      )
+    );
+
+    setMessageText("");
+  }
+
+  window.addEventListener(
+    "bmkalahub:enquiry-deleted",
+    handleEnquiryDeleted
+  );
+
+  return () => {
+    window.removeEventListener(
+      "bmkalahub:enquiry-deleted",
+      handleEnquiryDeleted
+    );
+  };
+}, []);
 
   async function loadEnquiries() {
     try {
@@ -273,6 +384,58 @@ export default function Messages() {
       setSending(false);
     }
   }
+
+     async function deleteMessage(messageId: string) {
+  if (deletingMessageId === messageId) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Delete this message? This action cannot be undone."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setDeletingMessageId(messageId);
+    setMessageError("");
+
+    const response = await fetch(
+      `/api/messages/${messageId}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessageError(
+        data.message || "Failed to delete message."
+      );
+      return;
+    }
+
+    setMessages((currentMessages) =>
+      currentMessages.filter(
+        (item) => item._id !== messageId
+      )
+    );
+  } catch (error) {
+    console.error(
+      "Delete message error:",
+      error
+    );
+
+    setMessageError(
+      "Something went wrong while deleting the message."
+    );
+  } finally {
+    setDeletingMessageId(null);
+  }
+}
 
   function handleMessageKeyDown(
     event: React.KeyboardEvent<HTMLTextAreaElement>
@@ -441,23 +604,56 @@ export default function Messages() {
                 ) : (
                   messages.map((item) => (
                     <div
-                       key={item._id}
-                       className={`message-row ${
-                       item.senderId === currentUserId
-                      ? "message-row-own"
-                      : "message-row-other"
-                  }`}
-                 >
-                       <div className="message-bubble">
-                        <p>{item.message}</p>
+  key={item._id}
+  className={`message-row ${
+    item.senderId === currentUserId
+      ? "message-row-own"
+      : "message-row-other"
+  }`}
+>
+  <div className="message-bubble">
+    <p>{item.message}</p>
 
-                        <span>
-                          {formatDate(
-                            item.createdAt
-                          )}
-                        </span>
-                      </div>
-                    </div>
+    <span>
+      {formatDate(item.createdAt)}
+    </span>
+  </div>
+
+  {item.senderId === currentUserId && (
+    <button
+      type="button"
+      className="message-delete-button"
+      onClick={() =>
+        deleteMessage(item._id)
+      }
+      disabled={
+        deletingMessageId === item._id
+      }
+      aria-label="Delete message"
+      title="Delete message"
+    >
+      {deletingMessageId === item._id ? (
+        "..."
+      ) : (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v5" />
+          <path d="M14 11v5" />
+        </svg>
+      )}
+    </button>
+  )}
+</div>
                   ))
                 )}
               </div>
@@ -650,9 +846,9 @@ export default function Messages() {
         }
 
         .status-closed {
-          background: #f3f4f6;
-          color: #4b5563;
-        }
+          color: #b91c1c;
+          background: #fff0f0;
+       }
 
         .conversation-event {
           display: block;
@@ -783,6 +979,60 @@ export default function Messages() {
           border-radius: 14px 14px 4px 14px;
           background: #111827;
           color: #ffffff;
+        }
+
+        .message-delete-button {
+          width: 32px;
+          height: 32px;
+          flex: 0 0 32px;
+
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 1px solid #e5e7eb;
+          border-radius: 9px;
+
+          background: #ffffff;
+          color: #64748b;
+
+          cursor: pointer;
+
+          box-shadow:
+          0 3px 10px rgba(15, 23, 42, 0.10);
+
+          transition:
+          background 0.18s ease,
+          color 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.18s ease,
+          box-shadow 0.18s ease;
+        }
+
+        .message-delete-button:hover:not(:disabled) {
+          background: #fff1f2;
+          color: #dc2626;
+          border-color: #fecdd3;
+
+          transform: translateY(-1px);
+
+          box-shadow:
+          0 5px 14px rgba(220, 38, 38, 0.14);
+        }
+
+        .message-delete-button:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .message-delete-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .message-delete-button svg {
+          width: 16px;
+          height: 16px;
         }
 
         .message-bubble p {
