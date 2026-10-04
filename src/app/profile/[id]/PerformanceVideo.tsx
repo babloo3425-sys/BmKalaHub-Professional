@@ -11,12 +11,44 @@ export default function PerformanceVideo({
 }: PerformanceVideoProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Android WebView background music control
+  const notifyAndroid = (action: "pause" | "resume") => {
+    if (typeof window === "undefined") return;
+
+    const androidBridge = (
+      window as typeof window & {
+        Android?: {
+          pauseBackgroundMusic?: () => void;
+          resumeBackgroundMusic?: () => void;
+        };
+      }
+    ).Android;
+
+    if (!androidBridge) return;
+
+    if (action === "pause") {
+      androidBridge.pauseBackgroundMusic?.();
+    } else {
+      androidBridge.resumeBackgroundMusic?.();
+    }
+  };
+
+  const openVideo = () => {
+    notifyAndroid("pause");
+    setIsOpen(true);
+  };
+
+  const closeVideo = () => {
+    notifyAndroid("resume");
+    setIsOpen(false);
+  };
+
   return (
     <>
       <button
         type="button"
         className="public-action"
-        onClick={() => setIsOpen(true)}
+        onClick={openVideo}
       >
         ▶ View Video
       </button>
@@ -27,12 +59,12 @@ export default function PerformanceVideo({
           role="dialog"
           aria-modal="true"
           aria-label="Performance video"
-          onClick={() => setIsOpen(false)}
+          onClick={closeVideo}
         >
           <button
             type="button"
             className="performance-video-close"
-            onClick={() => setIsOpen(false)}
+            onClick={closeVideo}
             aria-label="Close video"
           >
             ×
@@ -44,6 +76,9 @@ export default function PerformanceVideo({
             controls
             autoPlay
             playsInline
+            onPlay={() => notifyAndroid("pause")}
+            onPause={() => notifyAndroid("resume")}
+            onEnded={() => notifyAndroid("resume")}
             onClick={(event) => event.stopPropagation()}
           />
         </div>
