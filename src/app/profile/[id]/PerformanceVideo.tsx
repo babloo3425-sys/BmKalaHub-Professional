@@ -6,40 +6,39 @@ type PerformanceVideoProps = {
   videoUrl: string;
 };
 
+declare global {
+  interface Window {
+    BmKalaHubMusic?: {
+      pauseBackgroundMusic?: () => void;
+      resumeBackgroundMusic?: () => void;
+    };
+  }
+}
+
 export default function PerformanceVideo({
   videoUrl,
 }: PerformanceVideoProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Android WebView background music control
-  const notifyAndroid = (action: "pause" | "resume") => {
-    if (typeof window === "undefined") return;
+  const pauseBackgroundMusic = () => {
+    if (typeof window !== "undefined") {
+      window.BmKalaHubMusic?.pauseBackgroundMusic?.();
+    }
+  };
 
-    const androidBridge = (
-      window as typeof window & {
-        Android?: {
-          pauseBackgroundMusic?: () => void;
-          resumeBackgroundMusic?: () => void;
-        };
-      }
-    ).Android;
-
-    if (!androidBridge) return;
-
-    if (action === "pause") {
-      androidBridge.pauseBackgroundMusic?.();
-    } else {
-      androidBridge.resumeBackgroundMusic?.();
+  const resumeBackgroundMusic = () => {
+    if (typeof window !== "undefined") {
+      window.BmKalaHubMusic?.resumeBackgroundMusic?.();
     }
   };
 
   const openVideo = () => {
-    notifyAndroid("pause");
+    pauseBackgroundMusic();
     setIsOpen(true);
   };
 
   const closeVideo = () => {
-    notifyAndroid("resume");
+    resumeBackgroundMusic();
     setIsOpen(false);
   };
 
@@ -76,9 +75,9 @@ export default function PerformanceVideo({
             controls
             autoPlay
             playsInline
-            onPlay={() => notifyAndroid("pause")}
-            onPause={() => notifyAndroid("resume")}
-            onEnded={() => notifyAndroid("resume")}
+            onPlay={pauseBackgroundMusic}
+            onPause={resumeBackgroundMusic}
+            onEnded={resumeBackgroundMusic}
             onClick={(event) => event.stopPropagation()}
           />
         </div>
