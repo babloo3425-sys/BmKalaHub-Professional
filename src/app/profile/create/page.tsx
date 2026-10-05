@@ -92,6 +92,7 @@ export default function CreateProfilePage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("type", field);
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -168,7 +169,7 @@ export default function CreateProfilePage() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-
+        formData.append("type", "portfolio");
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
