@@ -25,6 +25,11 @@ const PORTFOLIO_TYPES = [
 
 const RESUME_TYPES = [
   "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
 const VIDEO_TYPES = [
@@ -185,14 +190,23 @@ export async function POST(request: Request) {
 
     /*
      * Resume
-     * PDF only - maximum 5 MB.
+     *
+     * Supported:
+     * PDF
+     * JPG
+     * PNG
+     * WEBP
+     * DOC
+     * DOCX
+     *
+     * Maximum 5 MB.
      */
     if (type === "resume") {
       if (!RESUME_TYPES.includes(file.type)) {
         return NextResponse.json(
           {
             message:
-              "Resume must be a PDF file.",
+              "Resume accepts PDF, JPG, PNG, WEBP, DOC or DOCX files.",
           },
           { status: 400 }
         );
@@ -312,6 +326,8 @@ export async function POST(request: Request) {
         message: "File uploaded successfully.",
         url: result.secure_url,
         resourceType: result.resource_type,
+        fileType: file.type,
+        fileName: file.name,
       },
       { status: 201 }
     );
