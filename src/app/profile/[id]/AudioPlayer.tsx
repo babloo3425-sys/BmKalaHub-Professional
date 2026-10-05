@@ -19,32 +19,42 @@ function formatTime(seconds: number) {
     .padStart(2, "0")}`;
 }
 
-function pauseBackgroundMusic() {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.AndroidMusic !== "undefined" &&
-    typeof window.AndroidMusic.pauseBackgroundMusic === "function"
-  ) {
-    window.AndroidMusic.pauseBackgroundMusic();
+/**
+ * Android WebView bridge.
+ *
+ * MainActivity exposes these methods:
+ * pauseBackgroundMusic()
+ * resumeBackgroundMusic()
+ */
+function pauseAppBackgroundMusic() {
+  try {
+    const androidBridge = (
+      window as typeof window & {
+        AndroidMusic?: {
+          pauseBackgroundMusic?: () => void;
+        };
+      }
+    ).AndroidMusic;
+
+    androidBridge?.pauseBackgroundMusic?.();
+  } catch {
+    // Normal browser: no Android bridge available.
   }
 }
 
-function resumeBackgroundMusic() {
-  if (
-    typeof window !== "undefined" &&
-    typeof window.AndroidMusic !== "undefined" &&
-    typeof window.AndroidMusic.resumeBackgroundMusic === "function"
-  ) {
-    window.AndroidMusic.resumeBackgroundMusic();
-  }
-}
+function resumeAppBackgroundMusic() {
+  try {
+    const androidBridge = (
+      window as typeof window & {
+        AndroidMusic?: {
+          resumeBackgroundMusic?: () => void;
+        };
+      }
+    ).AndroidMusic;
 
-declare global {
-  interface Window {
-    AndroidMusic?: {
-      pauseBackgroundMusic?: () => void;
-      resumeBackgroundMusic?: () => void;
-    };
+    androidBridge?.resumeBackgroundMusic?.();
+  } catch {
+    // Normal browser: no Android bridge available.
   }
 }
 
@@ -73,20 +83,12 @@ export default function AudioPlayer({
       setCurrentTime(audio.currentTime);
     };
 
-    const handlePlay = () => {
-      pauseBackgroundMusic();
-      setIsPlaying(true);
-    };
-
-    const handlePause = () => {
-      resumeBackgroundMusic();
-      setIsPlaying(false);
-    };
-
     const handleEnded = () => {
-      resumeBackgroundMusic();
       setIsPlaying(false);
       setCurrentTime(0);
+
+      // Artist audio finished → resume app background music.
+      resumeAppBackgroundMusic();
     };
 
     audio.addEventListener(
@@ -99,9 +101,10 @@ export default function AudioPlayer({
       handleTimeUpdate
     );
 
-    audio.addEventListener("play", handlePlay);
-    audio.addEventListener("pause", handlePause);
-    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener(
+      "ended",
+      handleEnded
+    );
 
     return () => {
       audio.removeEventListener(
@@ -114,9 +117,10 @@ export default function AudioPlayer({
         handleTimeUpdate
       );
 
-      audio.removeEventListener("play", handlePlay);
-      audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener(
+        "ended",
+        handleEnded
+      );
     };
   }, [isOpen]);
 
@@ -128,19 +132,23 @@ export default function AudioPlayer({
     }
 
     if (audio.paused) {
-      pauseBackgroundMusic();
+      // Artist audio starts → pause app background music.
+      pauseAppBackgroundMusic();
 
       try {
         await audio.play();
         setIsPlaying(true);
-      } catch (error) {
-        console.error("Audio playback failed:", error);
-        resumeBackgroundMusic();
+      } catch {
+        // If playback fails, restore background music.
+        resumeAppBackgroundMusic();
+        setIsPlaying(false);
       }
     } else {
       audio.pause();
       setIsPlaying(false);
-      resumeBackgroundMusic();
+
+      // Artist audio paused → resume app background music.
+      resumeAppBackgroundMusic();
     }
   }
 
@@ -167,11 +175,12 @@ export default function AudioPlayer({
       audio.currentTime = 0;
     }
 
-    resumeBackgroundMusic();
-
     setIsPlaying(false);
     setCurrentTime(0);
     setIsOpen(false);
+
+    // Artist audio closed → resume app background music.
+    resumeAppBackgroundMusic();
   }
 
   const progress =
@@ -184,10 +193,7 @@ export default function AudioPlayer({
       <button
         type="button"
         className="public-action"
-        onClick={() => {
-          pauseBackgroundMusic();
-          setIsOpen(true);
-        }}
+        onClick={() => setIsOpen(true)}
       >
         ▶ View Audio
       </button>
