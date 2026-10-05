@@ -19,42 +19,28 @@ function formatTime(seconds: number) {
     .padStart(2, "0")}`;
 }
 
-/**
- * Android WebView bridge.
- *
- * MainActivity exposes these methods:
- * pauseBackgroundMusic()
- * resumeBackgroundMusic()
- */
-function pauseAppBackgroundMusic() {
+function sendAndroidAudioCommand(command: "pause" | "resume") {
   try {
-    const androidBridge = (
-      window as typeof window & {
-        AndroidMusic?: {
+    const bridge = (
+      window as Window & {
+        Android?: {
           pauseBackgroundMusic?: () => void;
-        };
-      }
-    ).AndroidMusic;
-
-    androidBridge?.pauseBackgroundMusic?.();
-  } catch {
-    // Normal browser: no Android bridge available.
-  }
-}
-
-function resumeAppBackgroundMusic() {
-  try {
-    const androidBridge = (
-      window as typeof window & {
-        AndroidMusic?: {
           resumeBackgroundMusic?: () => void;
         };
       }
-    ).AndroidMusic;
+    ).Android;
 
-    androidBridge?.resumeBackgroundMusic?.();
+    if (!bridge) {
+      return;
+    }
+
+    if (command === "pause") {
+      bridge.pauseBackgroundMusic?.();
+    } else {
+      bridge.resumeBackgroundMusic?.();
+    }
   } catch {
-    // Normal browser: no Android bridge available.
+    // Browser/Vercel environment may not have the Android bridge.
   }
 }
 
@@ -87,8 +73,8 @@ export default function AudioPlayer({
       setIsPlaying(false);
       setCurrentTime(0);
 
-      // Artist audio finished → resume app background music.
-      resumeAppBackgroundMusic();
+      // Audio finished → resume Android background music.
+      sendAndroidAudioCommand("resume");
     };
 
     audio.addEventListener(
@@ -101,10 +87,7 @@ export default function AudioPlayer({
       handleTimeUpdate
     );
 
-    audio.addEventListener(
-      "ended",
-      handleEnded
-    );
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
       audio.removeEventListener(
@@ -117,10 +100,7 @@ export default function AudioPlayer({
         handleTimeUpdate
       );
 
-      audio.removeEventListener(
-        "ended",
-        handleEnded
-      );
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [isOpen]);
 
@@ -132,23 +112,23 @@ export default function AudioPlayer({
     }
 
     if (audio.paused) {
-      // Artist audio starts → pause app background music.
-      pauseAppBackgroundMusic();
-
       try {
+        // Audio is starting → stop Android background music.
+        sendAndroidAudioCommand("pause");
+
         await audio.play();
         setIsPlaying(true);
       } catch {
-        // If playback fails, restore background music.
-        resumeAppBackgroundMusic();
+        // If browser blocks playback, restore background music.
+        sendAndroidAudioCommand("resume");
         setIsPlaying(false);
       }
     } else {
       audio.pause();
       setIsPlaying(false);
 
-      // Artist audio paused → resume app background music.
-      resumeAppBackgroundMusic();
+      // Audio paused → resume Android background music.
+      sendAndroidAudioCommand("resume");
     }
   }
 
@@ -179,8 +159,12 @@ export default function AudioPlayer({
     setCurrentTime(0);
     setIsOpen(false);
 
-    // Artist audio closed → resume app background music.
-    resumeAppBackgroundMusic();
+    // Audio viewer closed → resume Android background music.
+    sendAndroidAudioCommand("resume");
+  }
+
+  function openPlayer() {
+    setIsOpen(true);
   }
 
   const progress =
@@ -193,7 +177,7 @@ export default function AudioPlayer({
       <button
         type="button"
         className="public-action"
-        onClick={() => setIsOpen(true)}
+        onClick={openPlayer}
       >
         ▶ View Audio
       </button>
