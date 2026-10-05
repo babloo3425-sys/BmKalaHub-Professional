@@ -83,41 +83,75 @@ export default function CreateProfilePage() {
   const [loading, setLoading] = useState(false);
 
   async function uploadFile(
-    file: File,
-    field: UploadField
-  ): Promise<string | null> {
-    setError("");
-    setUploading(field);
+  file: File,
+  field: UploadField
+): Promise<string | null> {
+  setError("");
+  setUploading(field);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", field);
+  try {
+    const signatureResponse = await fetch("/api/upload/signature", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: field,
+      }),
+    });
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+    const signatureData = await signatureResponse.json();
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to upload file.");
-      }
-
-      return data.url;
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to upload file."
+    if (!signatureResponse.ok) {
+      throw new Error(
+        signatureData.message || "Unable to prepare upload."
       );
-      return null;
-    } finally {
-      setUploading("");
     }
-  }
 
+    const resourceType =
+      field === "profilePhoto" || field === "portfolio"
+        ? "image"
+        : field === "video" || field === "audio"
+        ? "video"
+        : "raw";
+
+    const cloudinaryFormData = new FormData();
+
+    cloudinaryFormData.append("file", file);
+    cloudinaryFormData.append("api_key", signatureData.apiKey);
+    cloudinaryFormData.append("timestamp", String(signatureData.timestamp));
+    cloudinaryFormData.append("signature", signatureData.signature);
+    cloudinaryFormData.append("folder", signatureData.folder);
+
+    const uploadResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${resourceType}/upload`,
+      {
+        method: "POST",
+        body: cloudinaryFormData,
+      }
+    );
+
+    const uploadData = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        uploadData.error?.message || "Unable to upload file."
+      );
+    }
+
+    return uploadData.secure_url;
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to upload file."
+    );
+
+    return null;
+  } finally {
+    setUploading("");
+  }
+}
   async function handleSingleUpload(
     event: React.ChangeEvent<HTMLInputElement>,
     field: Exclude<UploadField, "portfolio">
@@ -152,52 +186,41 @@ export default function CreateProfilePage() {
   }
 
   async function handlePortfolioUpload(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const files = Array.from(event.target.files || []);
+  event: React.ChangeEvent<HTMLInputElement>
+) {
+  const files = Array.from(event.target.files || []);
 
-    if (!files.length) {
-      return;
-    }
+  if (!files.length) {
+    return;
+  }
 
-    setError("");
-    setUploading("portfolio");
+  setError("");
 
-    try {
-      const uploadedUrls: string[] = [];
+  const uploadedUrls: string[] = [];
 
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("type", "portfolio");
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+  try {
+    for (const file of files) {
+      const url = await uploadFile(file, "portfolio");
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message || "Unable to upload portfolio."
-          );
-        }
-
-        uploadedUrls.push(data.url);
+      if (!url) {
+        return;
       }
 
-      setPortfolio((current) => [...current, ...uploadedUrls]);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to upload portfolio."
-      );
-    } finally {
-      setUploading("");
-      event.target.value = "";
+      uploadedUrls.push(url);
     }
+
+    setPortfolio((current) => [...current, ...uploadedUrls]);
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to upload portfolio."
+    );
+  } finally {
+    setUploading("");
+    event.target.value = "";
   }
+}
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
