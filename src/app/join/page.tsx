@@ -2,12 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import "../auth.css";
 
-export default function JoinPage() {
-  const router = useRouter();
-
+export default function JoinPage() {  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,8 +45,7 @@ export default function JoinPage() {
       setEmail("");
       setPassword("");
 
-      router.replace("/login");
-      router.refresh();
+      
     } catch (err) {
       setError(
         err instanceof Error
