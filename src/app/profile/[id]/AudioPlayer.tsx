@@ -19,6 +19,35 @@ function formatTime(seconds: number) {
     .padStart(2, "0")}`;
 }
 
+function pauseBackgroundMusic() {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.AndroidMusic !== "undefined" &&
+    typeof window.AndroidMusic.pauseBackgroundMusic === "function"
+  ) {
+    window.AndroidMusic.pauseBackgroundMusic();
+  }
+}
+
+function resumeBackgroundMusic() {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.AndroidMusic !== "undefined" &&
+    typeof window.AndroidMusic.resumeBackgroundMusic === "function"
+  ) {
+    window.AndroidMusic.resumeBackgroundMusic();
+  }
+}
+
+declare global {
+  interface Window {
+    AndroidMusic?: {
+      pauseBackgroundMusic?: () => void;
+      resumeBackgroundMusic?: () => void;
+    };
+  }
+}
+
 export default function AudioPlayer({
   audioUrl,
 }: AudioPlayerProps) {
@@ -44,7 +73,18 @@ export default function AudioPlayer({
       setCurrentTime(audio.currentTime);
     };
 
+    const handlePlay = () => {
+      pauseBackgroundMusic();
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      resumeBackgroundMusic();
+      setIsPlaying(false);
+    };
+
     const handleEnded = () => {
+      resumeBackgroundMusic();
       setIsPlaying(false);
       setCurrentTime(0);
     };
@@ -59,6 +99,8 @@ export default function AudioPlayer({
       handleTimeUpdate
     );
 
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
@@ -72,6 +114,8 @@ export default function AudioPlayer({
         handleTimeUpdate
       );
 
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
     };
   }, [isOpen]);
@@ -84,11 +128,19 @@ export default function AudioPlayer({
     }
 
     if (audio.paused) {
-      await audio.play();
-      setIsPlaying(true);
+      pauseBackgroundMusic();
+
+      try {
+        await audio.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error("Audio playback failed:", error);
+        resumeBackgroundMusic();
+      }
     } else {
       audio.pause();
       setIsPlaying(false);
+      resumeBackgroundMusic();
     }
   }
 
@@ -115,6 +167,8 @@ export default function AudioPlayer({
       audio.currentTime = 0;
     }
 
+    resumeBackgroundMusic();
+
     setIsPlaying(false);
     setCurrentTime(0);
     setIsOpen(false);
@@ -130,7 +184,10 @@ export default function AudioPlayer({
       <button
         type="button"
         className="public-action"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          pauseBackgroundMusic();
+          setIsOpen(true);
+        }}
       >
         ▶ View Audio
       </button>
