@@ -14,33 +14,38 @@ function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
 
-  return `${minutes}:${remainingSeconds
-    .toString()
-    .padStart(2, "0")}`;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function sendAndroidAudioCommand(command: "pause" | "resume") {
+function pauseAppBackgroundMusic() {
   try {
-    const bridge = (
-      window as Window & {
-        Android?: {
+    const musicBridge = (
+      window as typeof window & {
+        BmKalaHubMusic?: {
           pauseBackgroundMusic?: () => void;
+        };
+      }
+    ).BmKalaHubMusic;
+
+    musicBridge?.pauseBackgroundMusic?.();
+  } catch {
+    // Browser/web fallback: nothing to do.
+  }
+}
+
+function resumeAppBackgroundMusic() {
+  try {
+    const musicBridge = (
+      window as typeof window & {
+        BmKalaHubMusic?: {
           resumeBackgroundMusic?: () => void;
         };
       }
-    ).Android;
+    ).BmKalaHubMusic;
 
-    if (!bridge) {
-      return;
-    }
-
-    if (command === "pause") {
-      bridge.pauseBackgroundMusic?.();
-    } else {
-      bridge.resumeBackgroundMusic?.();
-    }
+    musicBridge?.resumeBackgroundMusic?.();
   } catch {
-    // Browser/Vercel environment may not have the Android bridge.
+    // Browser/web fallback: nothing to do.
   }
 }
 
@@ -69,12 +74,23 @@ export default function AudioPlayer({
       setCurrentTime(audio.currentTime);
     };
 
+    const handlePlay = () => {
+      setIsPlaying(true);
+      pauseAppBackgroundMusic();
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+
+      if (!audio.ended) {
+        resumeAppBackgroundMusic();
+      }
+    };
+
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
-
-      // Audio finished → resume Android background music.
-      sendAndroidAudioCommand("resume");
+      resumeAppBackgroundMusic();
     };
 
     audio.addEventListener(
@@ -87,6 +103,8 @@ export default function AudioPlayer({
       handleTimeUpdate
     );
 
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
@@ -100,6 +118,8 @@ export default function AudioPlayer({
         handleTimeUpdate
       );
 
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
     };
   }, [isOpen]);
@@ -111,24 +131,16 @@ export default function AudioPlayer({
       return;
     }
 
-    if (audio.paused) {
-      try {
-        // Audio is starting → stop Android background music.
-        sendAndroidAudioCommand("pause");
-
+    try {
+      if (audio.paused) {
+        pauseAppBackgroundMusic();
         await audio.play();
-        setIsPlaying(true);
-      } catch {
-        // If browser blocks playback, restore background music.
-        sendAndroidAudioCommand("resume");
-        setIsPlaying(false);
+      } else {
+        audio.pause();
       }
-    } else {
-      audio.pause();
+    } catch {
       setIsPlaying(false);
-
-      // Audio paused → resume Android background music.
-      sendAndroidAudioCommand("resume");
+      resumeAppBackgroundMusic();
     }
   }
 
@@ -157,14 +169,10 @@ export default function AudioPlayer({
 
     setIsPlaying(false);
     setCurrentTime(0);
+
+    resumeAppBackgroundMusic();
+
     setIsOpen(false);
-
-    // Audio viewer closed → resume Android background music.
-    sendAndroidAudioCommand("resume");
-  }
-
-  function openPlayer() {
-    setIsOpen(true);
   }
 
   const progress =
@@ -172,12 +180,14 @@ export default function AudioPlayer({
       ? (currentTime / duration) * 100
       : 0;
 
+  void progress;
+
   return (
     <>
       <button
         type="button"
         className="public-action"
-        onClick={openPlayer}
+        onClick={() => setIsOpen(true)}
       >
         ▶ View Audio
       </button>
@@ -287,8 +297,7 @@ export default function AudioPlayer({
                 <div
                   style={{
                     display: "flex",
-                    justifyContent:
-                      "space-between",
+                    justifyContent: "space-between",
                     marginTop: "5px",
                     color: "var(--text-secondary)",
                     fontSize: "12px",
