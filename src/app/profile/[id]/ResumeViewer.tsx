@@ -9,7 +9,10 @@ type ResumeViewerProps = {
 function getFileType(url: string): "pdf" | "image" | "unknown" {
   const cleanUrl = url.split("?")[0].toLowerCase();
 
-  if (cleanUrl.includes(".pdf")) {
+  if (
+    cleanUrl.includes(".pdf") ||
+    cleanUrl.includes("/raw/upload/")
+  ) {
     return "pdf";
   }
 
@@ -48,6 +51,34 @@ export default function ResumeViewer({
     };
   }, [isOpen]);
 
+  function openResume() {
+  const androidBridge = (
+    window as Window & {
+      BmKalaHubMusic?: {
+        openPdf?: (url: string) => void;
+      };
+    }
+  ).BmKalaHubMusic;
+
+  /*
+   * Android WebView:
+   * PDF is handled by native Android.
+   */
+  if (
+    fileType === "pdf" &&
+    typeof androidBridge?.openPdf === "function"
+  ) {
+    androidBridge.openPdf(resumeUrl);
+    return;
+  }
+
+  /*
+   * Normal browser / desktop:
+   * Keep the in-page PDF viewer.
+   */
+  setIsOpen(true);
+}
+
   function closeViewer() {
     setIsOpen(false);
   }
@@ -57,7 +88,7 @@ export default function ResumeViewer({
       <button
         type="button"
         className="public-action primary"
-        onClick={() => setIsOpen(true)}
+        onClick={openResume}
       >
         View Resume
       </button>
@@ -122,6 +153,7 @@ export default function ResumeViewer({
                 "0 24px 80px rgba(0, 0, 0, 0.45)",
             }}
           >
+            {/* PDF viewer for normal browser / desktop */}
             {fileType === "pdf" && (
               <iframe
                 src={`${resumeUrl}#toolbar=1&navpanes=0&scrollbar=1`}
@@ -136,14 +168,17 @@ export default function ResumeViewer({
               />
             )}
 
+            {/* Image resume */}
             {fileType === "image" && (
               <div
                 style={{
                   width: "100%",
                   height: "100%",
                   overflow: "auto",
-                  WebkitOverflowScrolling: "touch",
-                  touchAction: "pan-x pan-y pinch-zoom",
+                  WebkitOverflowScrolling:
+                    "touch",
+                  touchAction:
+                    "pan-x pan-y pinch-zoom",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -156,11 +191,10 @@ export default function ResumeViewer({
                   draggable={false}
                   style={{
                     display: "block",
-                    maxWidth: "none",
                     width: "auto",
                     height: "auto",
-                    minWidth: "100%",
-                    minHeight: "100%",
+                    maxWidth: "100%",
+                    maxHeight: "100%",
                     objectFit: "contain",
                     userSelect: "none",
                     WebkitUserSelect: "none",
@@ -171,6 +205,7 @@ export default function ResumeViewer({
               </div>
             )}
 
+            {/* Unsupported format */}
             {fileType === "unknown" && (
               <div
                 style={{
@@ -188,8 +223,11 @@ export default function ResumeViewer({
                   fontWeight: 700,
                 }}
               >
-                This resume format is not supported.
-                Please upload a PDF or image resume.
+                This resume format is not
+                supported.
+                <br />
+                Please upload a PDF or image
+                resume.
               </div>
             )}
           </div>
