@@ -14,9 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.bmkalahub.com"),
   title: "BmKalaHub - Artist Community",
   description:
     "Join BmKalaHub, India's creative talent network, and create your professional artist profile.",
+  alternates: {
+    canonical: "/",
+  },
 };
 
 export default function RootLayout({
