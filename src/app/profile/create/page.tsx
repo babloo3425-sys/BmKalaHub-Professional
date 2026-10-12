@@ -256,8 +256,66 @@ export default function CreateProfilePage() {
         );
       }
 
-      router.replace("/dashboard");
-      router.refresh();
+    
+const androidBridge = (
+  window as Window & {
+    BmKalaHubMusic?: {
+      showProfileCreatedAd?: () => void;
+    };
+  }
+).BmKalaHubMusic;
+
+if (androidBridge?.showProfileCreatedAd) {
+  await new Promise<void>((resolve) => {
+    let completed = false;
+
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+
+      window.removeEventListener(
+        "bm-interstitial-finished",
+        finish
+      );
+
+      window.removeEventListener(
+        "bm-interstitial-unavailable",
+        finish
+      );
+
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const timeoutId = window.setTimeout(finish, 8000);
+
+    window.addEventListener(
+      "bm-interstitial-finished",
+      finish
+    );
+
+    window.addEventListener(
+      "bm-interstitial-unavailable",
+      finish
+    );
+
+    
+  try {
+  if (androidBridge?.showProfileCreatedAd) {
+    androidBridge.showProfileCreatedAd();
+  } else {
+    finish();
+  }
+ } catch {
+  finish();
+ }
+
+  });
+ }
+
+  router.replace("/dashboard");
+  router.refresh();
+
     } catch (err) {
       setError(
         err instanceof Error
