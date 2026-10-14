@@ -399,6 +399,37 @@ export default function ContactPage() {
               security information by email.
             </p>
 
+            
+            <section aria-labelledby="account-deletion-title">
+              <h2 id="account-deletion-title">
+                Account Deletion Requests
+              </h2>
+
+              <p>
+                If you want to delete your BmKalaHub account and
+                associated data, please contact our Admin using the
+                email address below. Send your request from the email
+                address registered with your account and mention
+                whether you have a User account or a Category account.
+                Write &quot;Account Deletion Request&quot; in the
+                subject line. Do not include your password.
+              </p>
+
+              <a
+                href="mailto:noreply@bmtheaterhub.com?subject=Account%20Deletion%20Request"
+                className="contact-email"
+              >
+                Contact Admin for Account Deletion
+              </a>
+
+              <p>
+                Your request will be reviewed by the Admin. We may
+                contact you to verify account ownership before
+                processing the deletion.
+              </p>
+            </section>
+
+
             <div className="contact-note">
               BmKalaHub is an artist discovery platform. For
               professional arrangements between artists and visitors,
