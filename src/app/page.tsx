@@ -235,9 +235,7 @@ return (
       Search artists
     </button>
    </form>
-  </section>
-
-      <AdUnit />
+  </section>   
 
       <section
         className="categories-section"
