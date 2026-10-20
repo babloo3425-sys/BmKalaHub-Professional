@@ -7,6 +7,7 @@ import MobileMenu from "./MobileMenu";
 import Profile from "@/models/Profile";
 import User from "@/models/User";
 import FeaturedTalent from "./FeaturedTalent";
+import AdUnit from "./AdUnit";
 
 type FeaturedArtist = {
   _id: string;
@@ -235,6 +236,8 @@ return (
     </button>
    </form>
   </section>
+
+      <AdUnit />
 
       <section
         className="categories-section"
